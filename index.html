@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClipForge — AI Video Clipper</title>
+<style>
+:root{color-scheme:dark;--bg:#090b12;--panel:#121622;--line:#252c3c;--muted:#929bb0;--white:#f4f6fb;--accent:#8b7cff;--yellow:#ffd84d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0%,#1b1a38 0,transparent 35%),var(--bg);color:var(--white);font:15px Inter,system-ui,Arial}
+main{max-width:900px;margin:48px auto;padding:0 18px}.brand{font-size:14px;letter-spacing:2px;color:#b9b2ff;font-weight:800}.hero{text-align:center;margin:50px 0 34px}.hero h1{font-size:clamp(34px,7vw,58px);line-height:1.03;margin:12px 0}.hero p{color:var(--muted);max-width:600px;margin:14px auto}.grad{background:linear-gradient(90deg,#a99dff,#ffd84d);background-clip:text;color:transparent}
+.panel{background:linear-gradient(180deg,#151a29,#101420);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 20px 70px #0005}.tabs{display:flex;gap:8px;margin-bottom:18px}.tab,button{border:0;border-radius:12px;padding:12px 16px;background:#242b3d;color:#fff;font-weight:700;cursor:pointer}.tab.active,button.primary{background:var(--accent);color:#0b0b17}.field{width:100%;background:#0b0f19;border:1px solid var(--line);color:white;padding:15px;border-radius:12px;font-size:15px}.drop{border:1px dashed #4b5270;padding:28px;text-align:center;border-radius:14px;color:var(--muted)}.drop input{max-width:100%;margin-top:14px}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row button{flex:1}.hint{font-size:12px;color:var(--muted);line-height:1.6}.hidden{display:none!important}#status{margin-top:18px;color:#d8d4ff}.bar{height:7px;background:#272d3d;border-radius:9px;overflow:hidden;margin-top:10px}.bar span{display:block;height:100%;width:15%;background:linear-gradient(90deg,#8b7cff,#ffd84d);transition:width .4s}.clips{display:grid;gap:10px;margin-top:18px}.clip{border:1px solid var(--line);padding:15px;border-radius:12px;display:flex;justify-content:space-between;gap:12px;align-items:center}.clip small{display:block;color:var(--muted);margin-top:4px}.clip a{color:#c6bdff;font-weight:700;text-decoration:none}.footer{text-align:center;color:#6f7890;font-size:12px;margin:22px 0}
+</style>
+</head>
+<body><main>
+<div class="brand">✦ CLIPFORGE</div>
+<section class="hero"><div class="brand">AI-POWERED SHORTS GENERATOR</div><h1>Long video in.<br><span class="grad">Viral moments out.</span></h1><p>Find the most engaging moments, add clean captions, and create vertical 720p clips automatically.</p></section>
+<section class="panel">
+<div class="tabs"><button class="tab active" id="urlTab" onclick="mode('url')">YouTube URL</button><button class="tab" id="fileTab" onclick="mode('file')">Upload video</button></div>
+<div id="urlBox"><input id="url" class="field" placeholder="Paste a YouTube video URL"></div>
+<div id="fileBox" class="drop hidden">Choose a video file<input id="file" type="file" accept="video/*"></div>
+<p class="hint">Creates at least 3 distinct clips in 9:16 · 720 × 1280 · white captions with yellow-highlighted phrases. Only upload or download videos you own or have permission to use.</p>
+<div class="row"><button class="primary" id="go" onclick="start()">Generate my clips ↗</button></div>
+<div id="status" class="hidden"><div id="message">Preparing…</div><div class="bar"><span id="fill"></span></div></div>
+<div id="results" class="clips"></div>
+</section><div class="footer">Powered by Gemini + FFmpeg · Render-ready</div>
+</main>
+<script>
+let selected='url', timer=null;
+function mode(m){selected=m;urlTab.classList.toggle('active',m==='url');fileTab.classList.toggle('active',m==='file');urlBox.classList.toggle('hidden',m!=='url');fileBox.classList.toggle('hidden',m!=='file')}
+async function start(){
+ const btn=document.getElementById('go');btn.disabled=true;results.innerHTML='';status.classList.remove('hidden');message.textContent='Uploading / preparing video…';fill.style.width='8%';
+ const fd=new FormData();
+ if(selected==='url'){const u=url.value.trim();if(!u){alert('Paste a YouTube URL first.');btn.disabled=false;return}fd.append('url',u)}
+ else {const f=file.files[0];if(!f){alert('Choose a video first.');btn.disabled=false;return}fd.append('file',f)}
+ try{
+  const r=await fetch('/api/jobs',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Could not start job');
+  poll(d.job_id);
+ }catch(e){message.textContent='Error: '+e.message;btn.disabled=false}
+}
+async function poll(id){
+ try{
+  const r=await fetch('/api/jobs/'+id);const d=await r.json();message.textContent=d.progress||d.status;
+  const p=d.status==='queued'?12:d.status==='processing'?45:d.status==='done'?100:100;fill.style.width=p+'%';
+  if(d.status==='done'){message.textContent='Your clips are ready · Model: '+(d.model||'Gemini');results.innerHTML=d.clips.map(c=>`<div class="clip"><div><b>${esc(c.name)}</b><small>${esc(c.reason)}</small></div><a href="${c.url}">Download MP4 ↓</a></div>`).join('');go.disabled=false;return}
+  if(d.status==='error'){message.textContent='Error: '+d.error;go.disabled=false;return}
+  setTimeout(()=>poll(id),4000)
+ }catch(e){message.textContent='Polling error: '+e.message;go.disabled=false}
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+</script></body></html>
